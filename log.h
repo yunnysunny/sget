@@ -1,5 +1,5 @@
-#ifndef _SW_LOG_H_
-#define _SW_LOG_H_ 1
+#ifndef LOG_H_
+#define LOG_H_
 
 #define LOG_NONE      0  //不记录日志
 #define LOG_FAULT      1  //致命错误，会导致返回错误或引起程序异常
@@ -44,5 +44,4 @@ int errorReturn(int errorCode,char *tag,char *msg);
 #define ERROR_RETURN(rv,msg) errorReturn(rv,DEF_LOG_MODULE,msg)
 #define ERROR_RETURN_TAG(rv,tag,msg) errorReturn(rv,tag,msg)
 
-#endif /*#ifndef _SW_LOG_H_*/
-
+#endif /*#ifndef LOG_H_*/
