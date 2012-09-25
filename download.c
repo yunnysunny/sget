@@ -289,7 +289,7 @@ bool HttpDownLoad(
 	memset(saveFilename,0,MAX_HEADER_ELEMENT_LEN);
 	hSocket=ConnectHttpNonProxy(strHostAddr,nHttpPort);//
 	if(hSocket == INVALID_SOCKET){
-		printf("服务器无法连接\n");
+		printf("can't connect to the sever\n");
 		return 1;
 	}
 	// 发送文件头，计算文件大小.
@@ -298,7 +298,7 @@ bool HttpDownLoad(
 
 	if (saveFilename == NULL)
 	{
-		printf("获取保存文件名失败\n");
+		printf("get the saved name failed.\n");
 		return FALSE;
 	}
 	if (saveFolder != NULL)
@@ -309,7 +309,7 @@ bool HttpDownLoad(
 		bool endFolder = false;
 		if (nameLen + folderLen +2 > MAX_HEADER_ELEMENT_LEN)
 		{
-			printf("保存文件夹路径名过长\n");
+			printf("the save folder path is too long.\n");
 			return FALSE;
 		}
 		if (endChar != NULL && strlen(endChar) == 1)
