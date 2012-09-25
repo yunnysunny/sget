@@ -12,6 +12,7 @@
 unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) {
 	struct sockaddr_in addr;
 	int socketfd;
+	struct hostent *phostent = NULL;
 
 #if defined(WIN32) || defined(WIN64)
 	BOOL bNodelay = TRUE;
@@ -74,8 +75,21 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 	}
 
 	addr.sin_family = AF_INET;
+
+	// 获取与主机相关的信息.
+	if ((phostent = gethostbyname (sServerAddr)) == NULL) 
+	{
+		LOG(LOG_ERROR,WSAGetLastError (),"Unable to get the host name. ");
+		closesocket (socketfd);
+		return ERROR_GET_HOST_NAME;
+	}
+
 	addr.sin_port = htons((short)nPort);
-	addr.sin_addr.s_addr = inet_addr(sServerAddr); 
+	//addr.sin_addr.s_addr = inet_addr(sServerAddr); 
+	// 给套接字IP地址赋值.
+	memcpy ((char *)&(addr.sin_addr), 
+		phostent->h_addr, 
+		phostent->h_length);
 
 	LOG(LOG_TRACE,0, "ConnectServer->connect");
 	if (connect(socketfd,(struct sockaddr *)&addr,sizeof(addr)) < 0) 
