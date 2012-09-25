@@ -5,4 +5,4 @@
 使用方法：
 sget url
 例如：
-sget 
+sget http://whyun.com/sub/0/download.php?filename=bluehandle-pc.7z
