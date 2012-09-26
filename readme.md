@@ -1,8 +1,8 @@
-==============================================
-¿çÆ½Ì¨µÄhttpÏÂÔØ¹¤¾ßsget
+# è·¨å¹³å°çš„httpä¸‹è½½å·¥å…·sget #
 
-==============================================
-Ê¹ÓÃ·½·¨£º
-sget url
-ÀýÈç£º
-sget http://whyun.com/sub/0/download.php?filename=bluehandle-pc.7z
+
+**ä½¿ç”¨æ–¹æ³•ï¼š**  
+`sget url`
+
+ä¾‹å¦‚ï¼š  
+> sget http://whyun.com/sub/0/download.php?filename=bluehandle-pc.7z
