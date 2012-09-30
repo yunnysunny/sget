@@ -30,6 +30,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #define USE_WIN_NOW
 #else
 #include <errno.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #endif
@@ -104,8 +105,12 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 	// 获取与主机相关的信息.
 	if ((phostent = gethostbyname (sServerAddr)) == NULL) 
 	{
+#if defined(WIN32) || defined(WIN64)
 		LOG(LOG_ERROR,WSAGetLastError (),"Unable to get the host name. ");
-		closesocket (socketfd);
+#else
+		LOG(LOG_ERROR,errno, "Unable to get the host name. ");
+#endif
+		CloseSocket(socketfd);
 		return ERROR_GET_HOST_NAME;
 	}
 
