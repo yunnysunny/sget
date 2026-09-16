@@ -25,21 +25,58 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #ifndef WIN_TO_LINUX_H_
 #define WIN_TO_LINUX_H_
+#ifndef TRUE
 #define TRUE								1
+#endif
+#ifndef FALSE
 #define FALSE							0
+#endif
+#ifndef true
 #define true								1
+#endif
+#ifndef false
 #define false								0
+#endif
 
+#if !defined(WIN32) && !defined(WIN64)
 typedef unsigned int DWORD;
-typedef int bool;
 typedef int BOOL;
 typedef unsigned int UINT;
+#endif
+typedef int bool;
 
 #if defined(WIN32) || defined(WIN64)
 #define snprintf		_snprintf
 #define sprintf		sprintf_s
 #define access		_access
 #define mkdir			_mkdir
+#endif
+
+/* --- 64-bit file offset type --- */
+#if defined(WIN32) || defined(WIN64)
+#ifndef _WINSOCKAPI_
+#include <winsock2.h>
+#endif
+#include <windows.h>
+typedef __int64 sget_off_t;
+#else
+#include <sys/types.h>
+typedef off_t sget_off_t;
+#endif
+
+/* --- Portable pwrite (write at offset without changing file position) --- */
+#if defined(WIN32) || defined(WIN64)
+#include <io.h>
+/* Implemented in win2linux.c */
+int sget_pwrite(int fd, const void *buf, unsigned int count, unsigned long offset);
+int sget_open_rw(const char *path);
+int sget_close(int fd);
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#define sget_pwrite(fd, buf, count, offset) pwrite(fd, buf, count, offset)
+#define sget_open_rw(path) open(path, O_CREAT | O_WRONLY, 0644)
+#define sget_close(fd) close(fd)
 #endif
 
 #endif

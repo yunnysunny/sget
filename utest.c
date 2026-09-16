@@ -26,6 +26,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #include "download.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(WIN32) || defined(WIN64)
 #include <io.h>
@@ -38,40 +39,66 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "win2linux.h"
 
+static void print_usage(const char *prog)
+{
+	printf("Usage: %s <url> [saveFolder] [-t thread_count]\n", prog);
+	printf("  url           HTTP URL to download\n");
+	printf("  saveFolder    Directory to save the file (optional)\n");
+	printf("  -t N          Number of download threads (default: %d)\n", DEFAULT_THREAD_COUNT);
+}
+
 int main( int argc, char *argv[ ] , char *envp[ ]  )
 {
-	const char*url;
+	const char *url = NULL;
 	const char *saveFolder = NULL;
+	int thread_count = 0; /* 0 = use default */
 	int rv;
+	int i;
 
 #if defined(WIN32) || defined(WIN64)
-	//system("chcp 65001");
 	setlocale(LC_ALL,"chs");
 #endif
 
-	if (argc == 1)
+	if (argc < 2)
 	{
-		printf("you haven't given the download url.\n");
+		print_usage(argv[0]);
 		return 1;
 	}
-	url = argv[1];//一个url地址例如：http://127.0.0.1:8880/qloa_v1.2.7z
-	printf("the url you wanna download now:%s\n",url);
-	if (argc > 2)
-	{
-		saveFolder = argv[2];
-		if( (access( saveFolder, 0 )) == -1 ) 
-		{
+
+	/* Parse arguments */
+	url = argv[1];
+
+	for (i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
+			thread_count = atoi(argv[++i]);
+			if (thread_count < 1) {
+				printf("Invalid thread count, using default\n");
+				thread_count = 0;
+			}
+		} else if (saveFolder == NULL) {
+			saveFolder = argv[i];
+		}
+	}
+
+	printf("URL: %s\n", url);
+	if (saveFolder != NULL) {
+		if ((access(saveFolder, 0)) == -1) {
 			mkdir(saveFolder);
 		}
 	}
-	
-	rv = WHY_Download(url,saveFolder);
+	if (thread_count > 0) {
+		printf("Thread count: %d\n", thread_count);
+	}
+
+	rv = WHY_DownloadMT(url, saveFolder, thread_count);
 	if (rv)
 	{
-		printf("下载完成\n");		
+		printf("\nDownload succeeded\n");
 	}
 	else
 	{
-		printf("下载失败\n");
+		printf("\nDownload failed\n");
 	}
+
+	return rv ? 0 : 1;
 }

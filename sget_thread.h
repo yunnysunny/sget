@@ -23,38 +23,39 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 @author yunnysunny<yunnysunny@gmail.com>
 
 */
-#include <string.h>
+#ifndef SGET_THREAD_H_
+#define SGET_THREAD_H_
 #include "win2linux.h"
 
+/* --- Thread --- */
 #if defined(WIN32) || defined(WIN64)
 #include <windows.h>
-#include <io.h>
-#include <fcntl.h>
-#include <sys/stat.h>
+typedef HANDLE sget_thread_t;
+typedef DWORD (WINAPI *sget_thread_func_t)(void *arg);
+#else
+#include <pthread.h>
+typedef pthread_t sget_thread_t;
+typedef void *(*sget_thread_func_t)(void *arg);
+#endif
 
-int sget_pwrite(int fd, const void *buf, unsigned int count, unsigned long offset) {
-	HANDLE h;
-	OVERLAPPED ov;
-	DWORD written = 0;
-	BOOL ok;
+int sget_thread_create(sget_thread_t *thread, sget_thread_func_t func, void *arg);
+int sget_thread_join(sget_thread_t thread);
 
-	h = (HANDLE)_get_osfhandle(fd);
-	if (h == INVALID_HANDLE_VALUE) return -1;
+/* --- Mutex --- */
+#if defined(WIN32) || defined(WIN64)
+typedef CRITICAL_SECTION sget_mutex_t;
+#else
+typedef pthread_mutex_t sget_mutex_t;
+#endif
 
-	memset(&ov, 0, sizeof(ov));
-	ov.Offset = (DWORD)(offset & 0xFFFFFFFF);
-	ov.OffsetHigh = (DWORD)(offset >> 32);
+int sget_mutex_init(sget_mutex_t *mutex);
+int sget_mutex_lock(sget_mutex_t *mutex);
+int sget_mutex_unlock(sget_mutex_t *mutex);
+int sget_mutex_destroy(sget_mutex_t *mutex);
 
-	ok = WriteFile(h, buf, count, &written, &ov);
-	if (!ok) return -1;
-	return (int)written;
-}
+/* --- Atomic flag for signal handling --- */
+/* Use volatile int as portable atomic flag */
+extern volatile int g_sget_should_stop;
+void sget_install_signal_handler(void);
 
-int sget_open_rw(const char *path) {
-	return _open(path, _O_CREAT | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE);
-}
-
-int sget_close(int fd) {
-	return _close(fd);
-}
 #endif

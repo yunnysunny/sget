@@ -28,6 +28,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #include "error_code.h"
 #if defined(WIN32) || defined(WIN64)
 #define USE_WIN_NOW
+#include <ws2tcpip.h>
 #else
 #include <errno.h>
 #include <netdb.h>
@@ -38,7 +39,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) {
 	struct sockaddr_in addr;
 	int socketfd;
-	struct hostent *phostent = NULL;
+	struct addrinfo hints, *res = NULL;
 
 #if defined(WIN32) || defined(WIN64)
 	BOOL bNodelay = TRUE;
@@ -102,24 +103,28 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 
 	addr.sin_family = AF_INET;
 
-	// 获取与主机相关的信息.
-	if ((phostent = gethostbyname (sServerAddr)) == NULL) 
+	/* Thread-safe DNS resolution via getaddrinfo */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if (getaddrinfo(sServerAddr, NULL, &hints, &res) != 0 || res == NULL)
 	{
 #if defined(WIN32) || defined(WIN64)
-		LOG(LOG_ERROR,WSAGetLastError (),"Unable to get the host name. ");
+		LOG(LOG_ERROR,WSAGetLastError(),"Unable to get the host name. ");
 #else
 		LOG(LOG_ERROR,errno, "Unable to get the host name. ");
 #endif
+		if (res) freeaddrinfo(res);
 		CloseSocket(socketfd);
 		return ERROR_GET_HOST_NAME;
 	}
 
 	addr.sin_port = htons((short)nPort);
-	//addr.sin_addr.s_addr = inet_addr(sServerAddr); 
-	// 给套接字IP地址赋值.
-	memcpy ((char *)&(addr.sin_addr), 
-		phostent->h_addr, 
-		phostent->h_length);
+	memcpy(&addr.sin_addr,
+		&((struct sockaddr_in *)res->ai_addr)->sin_addr,
+		sizeof(struct in_addr));
+	freeaddrinfo(res);
 
 	LOG(LOG_TRACE,0, "ConnectServer->connect");
 	if (connect(socketfd,(struct sockaddr *)&addr,sizeof(addr)) < 0) 

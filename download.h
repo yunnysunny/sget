@@ -51,7 +51,16 @@ typedef struct HttpHeadElement
 	unsigned int numval;	
 }STHttpHeadElement;
 
-bool WHY_Download(const char*strUrl,
-				  const char *saveFolder );
+/* Default thread count for multi-threaded download */
+#define DEFAULT_THREAD_COUNT 4
+#define DOWNLOAD_BUF_SIZE 4096
+
+/* HTTP header for Accept-Ranges */
+#define HTTP_HEADER_ACCEPT_RANGES "Accept-Ranges:"
+
+/* New public API - thread_count=0 means use DEFAULT_THREAD_COUNT */
+bool WHY_Download(const char *strUrl, const char *saveFolder);
+bool WHY_DownloadMT(const char *strUrl, const char *saveFolder, int thread_count);
 unsigned int getErrorCode();
+
 #endif
