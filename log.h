@@ -48,25 +48,25 @@ void LogMessage(char* sModule, int nLogLevel, char *sFile,int nLine,unsigned int
 
 int errorReturn(int errorCode,char *tag,char *msg);
 
-#define LOG_WITH_TAG(lvl, rv, tag,msg) LogMessage(lvl, tag, __FILE__, __LINE__, rv, msg)
+#define LOG_WITH_TAG(lvl, rv, tag, msg) LogMessage(tag, lvl, __FILE__, __LINE__, rv, msg)
 
 #define SIM_TRACE_TAG(tag,msg)	LOG_WITH_TAG(LOG_TRACE,0,tag,msg)
 
-#define SIM_TRACE(msg)	LOG_WITH_TAG(LOG_TRACE,0,DEF_LOG_MODULE,msg)
+#define SIM_TRACE(msg)	LOG_WITH_TAG(LOG_TRACE,0,DEFAULT_LOG_MODULE,msg)
 
 #define SIM_ERROR_TAG(tag,rv,msg)	LOG_WITH_TAG(LOG_ERROR,rv,tag,msg)
 
-#define SIM_ERROR(rv,msg)	LOG_WITH_TAG(LOG_ERROR,rv,DEF_LOG_MODULE,msg)
+#define SIM_ERROR(rv,msg)	LOG_WITH_TAG(LOG_ERROR,rv,DEFAULT_LOG_MODULE,msg)
 
 #define SIM_WARN_TAG(tag,rv,msg)	LOG_WITH_TAG(LOG_WARN,rv,tag,msg)
 
-#define SIM_WARN(rv,msg)	LOG_WITH_TAG(LOG_WARNING,rv,DEF_LOG_MODULE,msg)
+#define SIM_WARN(rv,msg)	LOG_WITH_TAG(LOG_WARN,rv,DEFAULT_LOG_MODULE,msg)
 
 #define SIM_INFO_TAG(tag,rv,msg)	LOG_WITH_TAG(LOG_INFO,rv,tag,msg)
 
-#define SIM_INFO(rv,msg)	LOG_WITH_TAG(LOG_INFO,rv,DEF_LOG_MODULE,msg)
+#define SIM_INFO(rv,msg)	LOG_WITH_TAG(LOG_INFO,rv,DEFAULT_LOG_MODULE,msg)
 
-#define ERROR_RETURN(rv,msg) errorReturn(rv,DEF_LOG_MODULE,msg)
+#define ERROR_RETURN(rv,msg) errorReturn(rv,DEFAULT_LOG_MODULE,msg)
 #define ERROR_RETURN_TAG(rv,tag,msg) errorReturn(rv,tag,msg)
 
 #endif /*#ifndef LOG_H_*/

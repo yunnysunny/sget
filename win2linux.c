@@ -32,7 +32,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #include <fcntl.h>
 #include <sys/stat.h>
 
-int sget_pwrite(int fd, const void *buf, unsigned int count, unsigned long offset) {
+int sget_pwrite(int fd, const void *buf, unsigned int count, uint64_t offset) {
 	HANDLE h;
 	OVERLAPPED ov;
 	DWORD written = 0;
@@ -52,6 +52,10 @@ int sget_pwrite(int fd, const void *buf, unsigned int count, unsigned long offse
 
 int sget_open_rw(const char *path) {
 	return _open(path, _O_CREAT | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE);
+}
+
+int sget_truncate(int fd, uint64_t size) {
+	return _chsize_s(fd, size) == 0 ? 0 : -1;
 }
 
 int sget_close(int fd) {

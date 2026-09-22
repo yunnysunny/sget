@@ -126,5 +126,6 @@ void sget_install_signal_handler(void)
 	SetConsoleCtrlHandler(sget_console_handler, TRUE);
 #else
 	signal(SIGINT, sget_signal_handler);
+	signal(SIGTERM, sget_signal_handler);
 #endif
 }

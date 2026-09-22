@@ -25,10 +25,12 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #ifndef METADATA_H_
 #define METADATA_H_
+#include <stdint.h>
 #include "win2linux.h"
 
 #define SGET_META_VERSION 1
 #define SGET_META_SUFFIX ".sget.meta"
+#define SGET_MAX_THREAD_COUNT 64
 
 #define CHUNK_STATUS_PENDING  0
 #define CHUNK_STATUS_RUNNING  1
@@ -37,9 +39,9 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef struct SgetChunk {
     int index;
-    unsigned long start;       /* byte range start */
-    unsigned long end;         /* byte range end (inclusive) */
-    unsigned long downloaded;  /* bytes downloaded so far in this chunk (offset from start) */
+    uint64_t start;       /* byte range start */
+    uint64_t end;         /* byte range end (inclusive) */
+    uint64_t downloaded;  /* bytes downloaded so far in this chunk (offset from start) */
     int status;
 } SgetChunk;
 
@@ -47,15 +49,17 @@ typedef struct SgetMetadata {
     int version;
     char url[2048];
     char filename[512];
-    unsigned long total_size;
+    uint64_t total_size;
     int thread_count;
     int accept_ranges;        /* 1 if server supports Range */
+    char validator[256];      /* strong ETag echoed via If-Range; empty means resume unverified */
     SgetChunk *chunks;
 } SgetMetadata;
 
 /* Create fresh metadata for a new download */
 SgetMetadata *metadata_create(const char *url, const char *filename,
-                              unsigned long total_size, int thread_count);
+                              uint64_t total_size, int thread_count,
+                              const char *validator);
 
 /* Load metadata from file. Returns NULL if file doesn't exist or is invalid. */
 SgetMetadata *metadata_load(const char *meta_path);

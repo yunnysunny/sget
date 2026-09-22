@@ -25,6 +25,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #ifndef DOWNLOAD_H_
 #define DOWNLOAD_H_
+#include <stdint.h>
 #include "win2linux.h"
 
 #define HOST_STR_LEN							64
@@ -34,8 +35,9 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #define MAX_HTTP_HEADER_LINE_LEN		2048
 
 #define END_OF_HTTP_HEADER_LINE		"\r\n"
-#define HTTP_HEADER_CONTENT_LENGTH			"Content-Length:"
-#define HTTP_HEADER_CONTENT_DISPOSITION			"Content-Disposition:"
+#define HTTP_HEADER_CONTENT_LENGTH             "Content-Length:"
+#define HTTP_HEADER_CONTENT_RANGE              "Content-Range:"
+#define HTTP_HEADER_CONTENT_DISPOSITION        "Content-Disposition:"
 
 #define DEFAULT_USER_AGENT				"User-Agent: Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1; Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET4.0C; .NET4.0E)\r\n"
 #define DEFAULT_ACCEPT_LANGUAGE	"Accept-Language: zh-cn\r\n"
@@ -48,7 +50,7 @@ typedef struct HttpHeadElement
 {
 	char type;	
 	char strval[MAX_HEADER_ELEMENT_LEN];
-	unsigned int numval;	
+	uint64_t numval;
 }STHttpHeadElement;
 
 /* Default thread count for multi-threaded download */
@@ -58,9 +60,10 @@ typedef struct HttpHeadElement
 /* HTTP header for Accept-Ranges */
 #define HTTP_HEADER_ACCEPT_RANGES "Accept-Ranges:"
 
-/* New public API - thread_count=0 means use DEFAULT_THREAD_COUNT */
-bool WHY_Download(const char *strUrl, const char *saveFolder);
-bool WHY_DownloadMT(const char *strUrl, const char *saveFolder, int thread_count);
+/* Public API */
+bool sget_download(const char *strUrl, const char *saveFolder);
+bool sget_download_mt(const char *strUrl, const char *saveFolder, int thread_count);
+
 unsigned int getErrorCode();
 
 #endif

@@ -1,4 +1,3 @@
-
 /Debug
 /Release
 *.sln
@@ -6,3 +5,9 @@
 *.ncb
 *.user
 /utest.exe
+/sget
+/sget.exe
+/core_tests.exe
+*.sget.meta
+/testdl/
+/build/

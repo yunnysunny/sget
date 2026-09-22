@@ -23,9 +23,10 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 @author yunnysunny<yunnysunny@gmail.com>
 
 */
-#include "commom_socket.h"
+#include "common_socket.h"
 #include "log.h"
 #include "error_code.h"
+#include <string.h>
 #if defined(WIN32) || defined(WIN64)
 #define USE_WIN_NOW
 #include <ws2tcpip.h>
@@ -34,11 +35,14 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/time.h>
 #endif
+
+#define SGET_TIMEOUT_SECONDS 30
 
 unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) {
 	struct sockaddr_in addr;
-	int socketfd;
+	SOCKET socketfd;
 	struct addrinfo hints, *res = NULL;
 
 #if defined(WIN32) || defined(WIN64)
@@ -47,13 +51,12 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 	int bNodelay = 1;
 #endif
 	int on = 1;
-	int so_buf_size;
-	struct linger so_linger;
 
 	LOG(LOG_TRACE,0, "ConnectServer");
 	*socketRt = INVALID_SOCKET;
 
-	if ((socketfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+	socketfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (socketfd == INVALID_SOCKET)
 	{
 		LOG(LOG_ERROR,ERROR_SOCKET_CREATE, "ConnectServer->socket");
 		return ERROR_SOCKET_CREATE;
@@ -68,31 +71,11 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 #else
 		LOG(LOG_ERROR,errno, "ConnectServer->setsockopt");
 #endif
+		CloseSocket(socketfd);
 		return ERROR_SET_REUSE_ADDR;
 	}
 
-	so_linger.l_onoff = 1;
-	so_linger.l_linger = 0;
-	if (setsockopt(socketfd,SOL_SOCKET,SO_LINGER,(char *)&so_linger,sizeof(struct linger)))
-	{
-		LOG(LOG_ERROR,ERROR_SET_LINGER, "ConnectServer->setsockopt");
-		return ERROR_SET_LINGER;
-	}
-
-	so_buf_size = SO_RCVBUF_SIZE;
-	if(setsockopt(socketfd,SOL_SOCKET,SO_RCVBUF,(const char *)&so_buf_size,sizeof(so_buf_size)))
-	{
-		LOG(LOG_ERROR,ERROR_SET_RECV_BUFF, "ConnectServer->setsockopt");
-		CloseSocket(socketfd);
-		return ERROR_SET_RECV_BUFF;
-	}
-	so_buf_size = SO_SNDBUF_SIZE;
-	if(setsockopt(socketfd,SOL_SOCKET,SO_SNDBUF,(const char *)&so_buf_size,sizeof(so_buf_size)))
-	{
-		LOG(LOG_ERROR,ERROR_SET_SEND_BUFF, "ConnectServer->setsockopt");
-		CloseSocket(socketfd);
-		return ERROR_SET_SEND_BUFF;
-	}
+	/* Socket buffers are left to the OS autotuning; a hard 20 KB cap throttles throughput. */
 
 	if(setsockopt(socketfd,IPPROTO_TCP,TCP_NODELAY,(const char*)&bNodelay,sizeof(bNodelay)))
 	{
@@ -137,6 +120,23 @@ unsigned int GetConnect(SOCKET *socketRt,const char   *sServerAddr, int  nPort) 
 		CloseSocket(socketfd);
 		return ERROR_SOCKET_CONNECT;
 	}	
+
+	/* Set recv and send timeouts */
+#if defined(WIN32) || defined(WIN64)
+	{
+		DWORD timeout_ms = SGET_TIMEOUT_SECONDS * 1000;
+		setsockopt(socketfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
+		setsockopt(socketfd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
+	}
+#else
+	{
+		struct timeval tv;
+		tv.tv_sec = SGET_TIMEOUT_SECONDS;
+		tv.tv_usec = 0;
+		setsockopt(socketfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+		setsockopt(socketfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+	}
+#endif
 
 	LOG(LOG_TRACE,0, "ConnectServer->return");
 	*socketRt = socketfd;

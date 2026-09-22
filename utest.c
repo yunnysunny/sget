@@ -24,6 +24,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 #include "download.h"
+#include "metadata.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +36,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #else
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #endif
 
 #include "win2linux.h"
@@ -47,7 +49,7 @@ static void print_usage(const char *prog)
 	printf("  -t N          Number of download threads (default: %d)\n", DEFAULT_THREAD_COUNT);
 }
 
-int main( int argc, char *argv[ ] , char *envp[ ]  )
+int main( int argc, char *argv[ ] , char * /*envp*/[]  )
 {
 	const char *url = NULL;
 	const char *saveFolder = NULL;
@@ -69,12 +71,19 @@ int main( int argc, char *argv[ ] , char *envp[ ]  )
 	url = argv[1];
 
 	for (i = 2; i < argc; i++) {
-		if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
-			thread_count = atoi(argv[++i]);
-			if (thread_count < 1) {
-				printf("Invalid thread count, using default\n");
-				thread_count = 0;
+		if (strcmp(argv[i], "-t") == 0) {
+			char *end;
+			long requested;
+			if (i + 1 >= argc) {
+				fprintf(stderr, "Missing thread count after -t\n");
+				return 1;
 			}
+			requested = strtol(argv[++i], &end, 10);
+			if (*end != '\0' || requested < 1 || requested > SGET_MAX_THREAD_COUNT) {
+				fprintf(stderr, "Thread count must be between 1 and %d\n", SGET_MAX_THREAD_COUNT);
+				return 1;
+			}
+			thread_count = (int)requested;
 		} else if (saveFolder == NULL) {
 			saveFolder = argv[i];
 		}
@@ -83,21 +92,28 @@ int main( int argc, char *argv[ ] , char *envp[ ]  )
 	printf("URL: %s\n", url);
 	if (saveFolder != NULL) {
 		if ((access(saveFolder, 0)) == -1) {
-			mkdir(saveFolder);
+#if defined(WIN32) || defined(WIN64)
+			if (mkdir(saveFolder) != 0) {
+#else
+			if (mkdir(saveFolder, 0755) != 0) {
+#endif
+				perror("Failed to create save folder");
+				return 1;
+			}
 		}
 	}
 	if (thread_count > 0) {
 		printf("Thread count: %d\n", thread_count);
 	}
 
-	rv = WHY_DownloadMT(url, saveFolder, thread_count);
+	rv = sget_download_mt(url, saveFolder, thread_count);
 	if (rv)
 	{
 		printf("\nDownload succeeded\n");
 	}
 	else
 	{
-		printf("\nDownload failed\n");
+		printf("\nDownload failed (error 0x%08x)\n", getErrorCode());
 	}
 
 	return rv ? 0 : 1;
