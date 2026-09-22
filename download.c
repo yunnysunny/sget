@@ -44,6 +44,44 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 /* Maximum number of retries per chunk on transient errors */
 #define CHUNK_MAX_RETRIES 3
 
+/* Fixed-width ASCII progress bar: portable across Windows and POSIX terminals. */
+#define PROGRESS_BAR_WIDTH 40
+
+static void print_progress_bar(uint64_t downloaded, uint64_t total)
+{
+	int i;
+	int filled;
+	double ratio;
+
+	if (total == 0) {
+		int marker = (int)((downloaded / DOWNLOAD_BUF_SIZE) % PROGRESS_BAR_WIDTH);
+		printf("\r[");
+		for (i = 0; i < PROGRESS_BAR_WIDTH; i++)
+			putchar(i == marker ? '>' : ' ');
+		printf("]   --.-%% %" PRIu64 " bytes", downloaded);
+		fflush(stdout);
+		return;
+	}
+
+	if (downloaded > total) downloaded = total;
+	ratio = (double)downloaded / (double)total;
+	filled = (int)(ratio * PROGRESS_BAR_WIDTH);
+	if (filled > PROGRESS_BAR_WIDTH) filled = PROGRESS_BAR_WIDTH;
+
+	printf("\r[");
+	for (i = 0; i < PROGRESS_BAR_WIDTH; i++) {
+		if (i < filled)
+			putchar('=');
+		else if (i == filled && filled < PROGRESS_BAR_WIDTH)
+			putchar('>');
+		else
+			putchar(' ');
+	}
+	printf("] %6.2f%% %" PRIu64 "/%" PRIu64 " bytes",
+		ratio * 100.0, downloaded, total);
+	fflush(stdout);
+}
+
 /* Last socket-level failure, so callers can inspect a failed download. */
 static unsigned int g_sget_last_error = 0;
 
@@ -593,8 +631,7 @@ static UINT DownLoadProcess(const char *szHostAddr,int nHostPort,
 			break;
 		}
 		nSumLen += (uint64_t)nLen;
-		printf("\r %" PRIu64 "/%" PRIu64, nSumLen, response_size);
-		fflush(stdout);
+		print_progress_bar(nSumLen, response_size);
 	}
 	if (fclose(savefp) != 0 || failed || g_sget_should_stop ||
 		(response_size != 0 && nSumLen != response_size)) {
@@ -931,10 +968,7 @@ static UINT HttpDownLoadMT(const char *strHostAddr, int nHttpPort,
 			}
 			sget_mutex_unlock(&progress_lock);
 
-			printf("\rProgress: %" PRIu64 "/%" PRIu64 " bytes (%.1f%%)",
-				total_downloaded, filesize,
-				filesize > 0 ? (double)total_downloaded * 100.0 / (double)filesize : 0.0);
-			fflush(stdout);
+			print_progress_bar(total_downloaded, filesize);
 		}
 		printf("\n");
 	}

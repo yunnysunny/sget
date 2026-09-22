@@ -10,4 +10,4 @@
 /core_tests.exe
 *.sget.meta
 /testdl/
-/build/
+/build*/
