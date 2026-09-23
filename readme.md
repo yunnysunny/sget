@@ -1,6 +1,6 @@
 # sget
 
-跨平台 HTTP 下载工具，支持分段（多线程）下载、指定线程数、可视化进度条，以及通过 `.sget.meta` 断点续传。
+跨平台 HTTP 下载工具，支持分段（多线程）下载、可视化进度条和断点续传。
 
 ## 使用
 
@@ -9,23 +9,43 @@ sget http://example.com/archive.tar
 sget http://example.com/archive.tar downloads -t 4
 ```
 
-`-t` 接受 1–64 个线程，默认 4。服务器不支持字节范围（`Accept-Ranges: bytes`）或文件
-过小时会自动退回单连接下载。中断后再次运行相同命令即可续传；续传时若服务器返回的
-强 ETag 与上次不一致（资源被替换），会自动放弃旧进度重新下载。
+Windows 下运行 `sget.exe`。命令格式为 `sget <url> [saveFolder] [-t N]`：
 
-目前只支持 `http://`。不支持 HTTPS、代理和重定向——遇到 3xx 会提示改用最终 URL，
-不会静默跟随。也不支持 `Transfer-Encoding: chunked` 与压缩内容：请求发送
-`Accept-Encoding: identity`，若服务器仍返回这些编码会报错退出，而不是写入错误数据。
+- `url`：必填，目前只接受 `http://` URL。
+- `saveFolder`：可选，默认保存到当前目录；不存在时只创建这一级目录，父目录需事先存在。
+- `-t N`：下载线程数，范围 1–64，默认 4。
+
+文件名优先取响应中的 `Content-Disposition`，否则取 URL 的最后一段（没有时用
+`index.html`）。进度条显示百分比和已下载字节数；服务器未给出文件大小时，只显示
+活动指示符和已下载字节数。进度条使用回车原地刷新，输出重定向到文件时会保留这些回车。
+
+成功退出码为 `0`，下载失败或命令行参数无效为 `1`。失败时显示具体诊断信息；
+`Download failed (error 0x...)` 中的错误码主要用于连接、收发和写入失败，
+HTTP 状态错误等情形可能显示 `0x00000000`，应以之前的诊断信息为准。
+
+## 断点续传
+
+当服务器支持字节范围、文件大小已知且使用多个线程时，sget 会在目标文件旁创建
+`<文件名>.sget.meta`。下载中断后，用相同 URL 和保存目录重新运行即可尝试续传；
+完成后元数据文件会被删除。服务器不支持字节范围、大小未知或使用 `-t 1` 时，
+改用单连接下载，**不会**创建元数据或续传，重新运行会从头下载。
+
+多线程续传会检查 URL 和文件大小。服务器提供强 ETag 时会保存它，并在分段请求中
+发送 `If-Range`；如果本次探测得到不同的强 ETag，就从头下载。若原下载或本次探测
+没有强 ETag，程序仍可能复用旧进度，但无法验证远端内容是否已更换。
+对完整性要求高时，请在下载后自行校验发布方提供的哈希值。
+
+## 协议限制
+
+目前不支持 HTTPS、代理或重定向。遇到 3xx 时需改用最终 URL；
+不支持 `Transfer-Encoding: chunked` 或压缩的响应内容。请求会发送
+`Accept-Encoding: identity`，若服务器仍返回不支持的编码，会报错退出。
 
 ## 构建与测试
 
-Linux / macOS：
-
-```sh
-./build.sh
-```
-
-或者使用 CMake（Windows/Linux/macOS）：
+需要支持 C99 的编译器和 CMake 3.16 或更新版本。CMake 支持 Windows、Linux
+和 macOS；仓库 CI 在 Linux (GCC/Clang) 和 Windows (MSVC/MinGW) 上构建并运行
+核心测试。
 
 ```sh
 cmake -S . -B build
@@ -33,11 +53,15 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-需要支持 C99 的编译器。Windows 下可用 w64devkit / MinGW：
+使用 Visual Studio 多配置生成器时，构建和测试都需指定配置：
 
 ```sh
-gcc -std=c99 -DWIN32 -D_CRT_SECURE_NO_WARNINGS -Wall -Wextra -O2 \
-    -o sget.exe log.c win2linux.c common_socket.c sget_thread.c metadata.c download.c utest.c -lws2_32
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-旧的 `sget.vcproj` 是 VS2008 工程文件，已删除；请使用 CMake 或上面的命令行构建。
+Linux / macOS 也可以直接运行 `./build.sh` 构建可执行文件。Windows 下使用
+w64devkit / MinGW 时，可通过 CMake 构建；旧的 VS2008 `sget.vcproj` 已删除。
+
+参与开发与提交前检查见 [CONTRIBUTING.md](CONTRIBUTING.md)，许可证见
+[LICENSE](LICENSE)。
