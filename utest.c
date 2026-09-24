@@ -29,6 +29,11 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdlib.h>
 #include <string.h>
 
+/* Set by the build system; local builds without it report a dev version. */
+#ifndef SGET_VERSION
+#define SGET_VERSION "0.0.0-dev"
+#endif
+
 #if defined(WIN32) || defined(WIN64)
 #include <io.h>
 #include <direct.h>
@@ -44,9 +49,11 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 static void print_usage(const char *prog)
 {
 	printf("Usage: %s <url> [saveFolder] [-t thread_count]\n", prog);
+	printf("       %s --version\n", prog);
 	printf("  url           HTTP URL to download\n");
 	printf("  saveFolder    Directory to save the file (optional)\n");
 	printf("  -t N          Number of download threads (default: %d)\n", DEFAULT_THREAD_COUNT);
+	printf("  --version     Print version and exit\n");
 }
 
 int main(int argc, char *argv[])
@@ -68,6 +75,11 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse arguments */
+	if (strcmp(argv[1], "--version") == 0) {
+		printf("sget %s\n", SGET_VERSION);
+		return 0;
+	}
+
 	url = argv[1];
 
 	for (i = 2; i < argc; i++) {

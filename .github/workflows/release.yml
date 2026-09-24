@@ -1,0 +1,212 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. v1.0.0). Used only when no tag triggered this run.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Tags are the source of truth for the version. A manual run has no tag, so it
+  # must supply one; either way the value lands in SGET_VERSION.
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Resolve
+        id: version
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="$DISPATCH_VERSION"
+          fi
+          case "$version" in
+            '') echo "No version given." >&2; exit 1 ;;
+            v*) ;;
+            *) echo "Version must start with 'v', got '$version'." >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    name: Linux x64
+    needs: resolve-version
+    runs-on: ubuntu-24.04
+    env:
+      SGET_VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSGET_VERSION_OVERRIDE="$SGET_VERSION"
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check reported version
+        run: test "$(./build/sget --version)" = "sget $SGET_VERSION"
+
+      - name: Package
+        run: tar -czf "sget-$SGET_VERSION-linux-x64.tar.gz" -C build sget
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          name: ${{ needs.resolve-version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: sget-${{ needs.resolve-version.outputs.version }}-linux-x64.tar.gz
+
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    needs: resolve-version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    env:
+      SGET_VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSGET_VERSION_OVERRIDE="$SGET_VERSION"
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check reported version
+        run: test "$(./build/sget --version)" = "sget $SGET_VERSION"
+
+      - name: Package
+        run: tar -czf "sget-$SGET_VERSION-macos-${{ matrix.arch }}.tar.gz" -C build sget
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          name: ${{ needs.resolve-version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: sget-${{ needs.resolve-version.outputs.version }}-macos-${{ matrix.arch }}.tar.gz
+
+  build-windows-mingw:
+    name: Windows x64 (MinGW)
+    needs: resolve-version
+    runs-on: windows-2022
+    env:
+      SGET_VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2 toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
+      - name: Configure
+        shell: msys2 {0}
+        run: cmake -S . -B build-mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DSGET_VERSION_OVERRIDE="$SGET_VERSION"
+
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build-mingw --parallel 2
+
+      - name: Test
+        shell: msys2 {0}
+        run: ctest --test-dir build-mingw --output-on-failure
+
+      - name: Check reported version
+        shell: msys2 {0}
+        run: test "$(./build-mingw/sget.exe --version)" = "sget $SGET_VERSION"
+
+      # Zip outside the MSYS2 shell so the archive is created by PowerShell's
+      # Compress-Archive and does not depend on extra MSYS2 packages.
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build-mingw/sget.exe dist/
+          Copy-Item LICENSE dist/
+          Compress-Archive -Path dist/sget.exe, dist/LICENSE -DestinationPath "sget-$env:SGET_VERSION-windows-x64.zip" -Force
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          name: ${{ needs.resolve-version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: sget-${{ needs.resolve-version.outputs.version }}-windows-x64.zip
+
+  checksums:
+    name: Checksums
+    needs: [resolve-version, build-linux, build-macos, build-windows-mingw]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -eu
+          mkdir -p assets
+          gh release download "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "sget-$VERSION-*" \
+            --dir assets
+
+      - name: Generate SHA256SUMS.txt
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -eu
+          cd assets
+          sha256sum "sget-$VERSION-"* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload SHA256SUMS.txt to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          fail_on_unmatched_files: true
+          files: assets/SHA256SUMS.txt

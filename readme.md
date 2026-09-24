@@ -7,6 +7,7 @@
 ```sh
 sget http://example.com/archive.tar
 sget http://example.com/archive.tar downloads -t 4
+sget --version
 ```
 
 Windows 下运行 `sget.exe`。命令格式为 `sget <url> [saveFolder] [-t N]`：
@@ -14,6 +15,7 @@ Windows 下运行 `sget.exe`。命令格式为 `sget <url> [saveFolder] [-t N]`�
 - `url`：必填，目前只接受 `http://` URL。
 - `saveFolder`：可选，默认保存到当前目录；不存在时只创建这一级目录，父目录需事先存在。
 - `-t N`：下载线程数，范围 1–64，默认 4。
+- `--version`：打印版本号后退出，退出码为 `0`。
 
 文件名优先取响应中的 `Content-Disposition`，否则取 URL 的最后一段（没有时用
 `index.html`）。进度条显示百分比和已下载字节数；服务器未给出文件大小时，只显示
@@ -41,15 +43,31 @@ HTTP 状态错误等情形可能显示 `0x00000000`，应以之前的诊断信�
 不支持 `Transfer-Encoding: chunked` 或压缩的响应内容。请求会发送
 `Accept-Encoding: identity`，若服务器仍返回不支持的编码，会报错退出。
 
+## 下载安装
+
+从 [Releases](https://github.com/yunnysunny/sget/releases) 下载对应平台的压缩包：
+
+| 平台 | 文件 |
+| --- | --- |
+| Windows x64 (MinGW) | `sget-<版本>-windows-x64.zip` |
+| Linux x64 | `sget-<版本>-linux-x64.tar.gz` |
+| macOS arm64 / x64 | `sget-<版本>-macos-arm64.tar.gz`、`sget-<版本>-macos-x64.tar.gz` |
+
+Windows 包内是 `sget.exe`（只依赖系统自带的 `msvcrt.dll` 和 `WS2_32.dll`，无需额外运行库）。
+Linux/macOS 包内是保留可执行权限的 `sget`。每个 Release 附 `SHA256SUMS.txt`，
+下载后可自行校验。
+
+版本号取 Git tag（如 `v1.0.0`）；`sget --version` 打印的就是构建时的这个值。
+
 ## 构建与测试
 
 需要支持 C99 的编译器和 CMake 3.16 或更新版本。CMake 支持 Windows、Linux
 和 macOS；仓库 CI 在 Linux (GCC/Clang)、macOS (arm64/x64) 和 Windows
-(MSVC/MinGW) 上构建并运行核心测试。通过的 workflow 运行会在 GitHub Actions
-页面的 Artifacts 中提供可执行程序：`sget-linux-x64`、`sget-macos-arm64`、
-`sget-macos-x64`、`sget-windows-x64-msvc` 和 `sget-windows-x64-mingw`。
-Linux/macOS 产物是保留可执行权限的 `tar.gz`，Windows 产物是 `sget.exe`；
-Artifacts 保留 14 天，不是长期发布的 Release。
+(MSVC/MinGW) 上构建并运行核心测试。
+
+开发构建的产物可在 GitHub Actions 页面的 Artifacts 中下载：`sget-linux-x64`、
+`sget-macos-arm64`、`sget-macos-x64`、`sget-windows-x64-msvc` 和
+`sget-windows-x64-mingw`。这些是持续集成产物，保留 14 天；对外发布的版本请看 Releases。
 
 ```sh
 cmake -S . -B build
@@ -64,8 +82,12 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Linux / macOS 也可以直接运行 `./build.sh` 构建可执行文件。Windows 下使用
-w64devkit / MinGW 时，可通过 CMake 构建；旧的 VS2008 `sget.vcproj` 已删除。
+Linux / macOS / MSYS2 / w64devkit 也可以直接运行 `./build.sh` 构建可执行文件；
+设置 `SGET_VERSION` 可写入版本号（`SGET_VERSION=v1.0.0 ./build.sh`）。
+旧的 VS2008 `sget.vcproj` 已删除。
+
+打 tag 推送（`v1.0.0` 格式）会触发 `.github/workflows/release.yml`，构建各平台产物、
+生成 `SHA256SUMS.txt` 并创建对应的 GitHub Release。
 
 参与开发与提交前检查见 [CONTRIBUTING.md](CONTRIBUTING.md)，许可证见
 [LICENSE](LICENSE)。

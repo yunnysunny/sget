@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
+
+# SGET_VERSION_OVERRIDE lets the release workflow stamp the tag name into the
+# binary. It is deliberately NOT a cache variable, so reconfiguring without it
+# refreshes the default instead of reusing the previous build's value.
+if(DEFINED SGET_VERSION_OVERRIDE AND NOT SGET_VERSION_OVERRIDE STREQUAL "")
+    set(SGET_VERSION "${SGET_VERSION_OVERRIDE}")
+else()
+    set(SGET_VERSION "0.0.0-dev")
+endif()
+
 project(sget LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
@@ -14,6 +24,7 @@ set(SGET_SOURCES
 )
 
 function(configure_sget target)
+    target_compile_definitions(${target} PRIVATE SGET_VERSION="${SGET_VERSION}")
     if(MSVC)
         target_compile_options(${target} PRIVATE /W3)
     else()

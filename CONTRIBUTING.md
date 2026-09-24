@@ -12,8 +12,24 @@ ctest --test-dir build --output-on-failure
 ```
 
 使用 Visual Studio 多配置生成器时，构建和测试加上 `--config Release` 和
-`-C Release`。Linux / macOS 也可以运行 `./build.sh` 检查命令行构建。
-CI 在 Linux (GCC、Clang) 和 Windows (MSVC、MinGW) 上执行构建与核心测试。
+`-C Release`。Linux / macOS 以及 MSYS2 / w64devkit 也可以运行 `./build.sh`
+检查命令行构建。CI 在 Linux (GCC、Clang) 和 Windows (MSVC、MinGW) 上执行构建与核心测试。
+
+版本号由构建时注入，默认 `0.0.0-dev`。CMake 传 `-DSGET_VERSION_OVERRIDE=v1.0.0`，
+`build.sh` 设 `SGET_VERSION=v1.0.0`；CI 传入的都是 Git tag 名。
+
+## 发布
+
+发布由 tag 触发，不要手动往 Release 传产物：
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+`.github/workflows/release.yml` 会构建 Linux x64、macOS arm64/x64 和 Windows x64
+(MinGW) 产物，验证 `sget --version` 与 tag 一致，生成 `SHA256SUMS.txt`，
+并创建对应的 GitHub Release。tag 名必须以 `v` 开头，否则 workflow 会拒绝运行。
 
 ## 提交改动
 
