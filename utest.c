@@ -49,7 +49,7 @@ static void print_usage(const char *prog)
 	printf("  -t N          Number of download threads (default: %d)\n", DEFAULT_THREAD_COUNT);
 }
 
-int main( int argc, char *argv[ ] , char * /*envp*/[]  )
+int main(int argc, char *argv[])
 {
 	const char *url = NULL;
 	const char *saveFolder = NULL;
