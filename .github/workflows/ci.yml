@@ -17,7 +17,7 @@ concurrency:
 jobs:
   linux:
     name: Linux (${{ matrix.compiler }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -40,9 +40,57 @@ jobs:
       - name: Verify build.sh
         run: ./build.sh
 
+      - name: Package Linux executable
+        if: matrix.compiler == 'gcc'
+        run: tar -czf build/sget-linux-x64.tar.gz -C build sget
+
+      - name: Upload Linux executable
+        if: matrix.compiler == 'gcc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sget-linux-x64
+          path: build/sget-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package macOS executable
+        run: tar -czf build/sget-macos-${{ matrix.arch }}.tar.gz -C build sget
+
+      - name: Upload macOS executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sget-macos-${{ matrix.arch }}
+          path: build/sget-macos-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   windows-msvc:
     name: Windows (MSVC)
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,9 +104,17 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
+      - name: Upload MSVC executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sget-windows-x64-msvc
+          path: build/Release/sget.exe
+          if-no-files-found: error
+          retention-days: 14
+
   windows-mingw:
     name: Windows (MinGW GCC)
-    runs-on: windows-latest
+    runs-on: windows-2022
     defaults:
       run:
         shell: msys2 {0}
@@ -84,3 +140,11 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build-mingw --output-on-failure
+
+      - name: Upload MinGW executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sget-windows-x64-mingw
+          path: build-mingw/sget.exe
+          if-no-files-found: error
+          retention-days: 14

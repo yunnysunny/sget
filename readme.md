@@ -44,8 +44,12 @@ HTTP 状态错误等情形可能显示 `0x00000000`，应以之前的诊断信�
 ## 构建与测试
 
 需要支持 C99 的编译器和 CMake 3.16 或更新版本。CMake 支持 Windows、Linux
-和 macOS；仓库 CI 在 Linux (GCC/Clang) 和 Windows (MSVC/MinGW) 上构建并运行
-核心测试。
+和 macOS；仓库 CI 在 Linux (GCC/Clang)、macOS (arm64/x64) 和 Windows
+(MSVC/MinGW) 上构建并运行核心测试。通过的 workflow 运行会在 GitHub Actions
+页面的 Artifacts 中提供可执行程序：`sget-linux-x64`、`sget-macos-arm64`、
+`sget-macos-x64`、`sget-windows-x64-msvc` 和 `sget-windows-x64-mingw`。
+Linux/macOS 产物是保留可执行权限的 `tar.gz`，Windows 产物是 `sget.exe`；
+Artifacts 保留 14 天，不是长期发布的 Release。
 
 ```sh
 cmake -S . -B build
