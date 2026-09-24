@@ -47,6 +47,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$version" >> "$GITHUB_OUTPUT"
 
+  # Build jobs only produce upload-artifact bundles. Creating the release from
+  # several jobs would append the generated notes once per job, so a single
+  # finalize job publishes everything at the end.
   build-linux:
     name: Linux x64
     needs: resolve-version
@@ -72,14 +75,13 @@ jobs:
       - name: Package
         run: tar -czf "sget-$SGET_VERSION-linux-x64.tar.gz" -C build sget
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.resolve-version.outputs.tag }}
-          name: ${{ needs.resolve-version.outputs.tag }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: sget-${{ needs.resolve-version.outputs.version }}-linux-x64.tar.gz
+          name: release-linux-x64
+          path: sget-${{ needs.resolve-version.outputs.version }}-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
   build-macos:
     name: macOS ${{ matrix.arch }}
@@ -114,14 +116,13 @@ jobs:
       - name: Package
         run: tar -czf "sget-$SGET_VERSION-macos-${{ matrix.arch }}.tar.gz" -C build sget
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.resolve-version.outputs.tag }}
-          name: ${{ needs.resolve-version.outputs.tag }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: sget-${{ needs.resolve-version.outputs.version }}-macos-${{ matrix.arch }}.tar.gz
+          name: release-macos-${{ matrix.arch }}
+          path: sget-${{ needs.resolve-version.outputs.version }}-macos-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
   build-windows-mingw:
     name: Windows x64 (MinGW)
@@ -169,44 +170,64 @@ jobs:
           Copy-Item LICENSE dist/
           Compress-Archive -Path dist/sget.exe, dist/LICENSE -DestinationPath "sget-$env:SGET_VERSION-windows-x64.zip" -Force
 
-      - name: Upload to release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: sget-${{ needs.resolve-version.outputs.version }}-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  # Single place that creates the release: the notes are generated exactly once,
+  # and every asset plus SHA256SUMS.txt is attached together.
+  finalize-release:
+    name: Publish release
+    needs: [resolve-version, build-linux, build-macos, build-windows-mingw]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Show collected assets
+        run: ls -l artifacts
+
+      - name: Generate SHA256SUMS.txt
+        working-directory: artifacts
+        run: |
+          set -eu
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Verify expected assets are present
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -eu
+          cd artifacts
+          for suffix in \
+            "linux-x64.tar.gz" \
+            "macos-arm64.tar.gz" \
+            "macos-x64.tar.gz" \
+            "windows-x64.zip"
+          do
+            file="sget-$VERSION-$suffix"
+            test -f "$file" || { echo "Missing asset: $file" >&2; exit 1; }
+          done
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
           name: ${{ needs.resolve-version.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: sget-${{ needs.resolve-version.outputs.version }}-windows-x64.zip
-
-  checksums:
-    name: Checksums
-    needs: [resolve-version, build-linux, build-macos, build-windows-mingw]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: |
-          set -eu
-          mkdir -p assets
-          gh release download "$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "sget-$VERSION-*" \
-            --dir assets
-
-      - name: Generate SHA256SUMS.txt
-        env:
-          VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: |
-          set -eu
-          cd assets
-          sha256sum "sget-$VERSION-"* > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - name: Upload SHA256SUMS.txt to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.resolve-version.outputs.tag }}
-          fail_on_unmatched_files: true
-          files: assets/SHA256SUMS.txt
+          files: |
+            artifacts/sget-${{ needs.resolve-version.outputs.version }}-linux-x64.tar.gz
+            artifacts/sget-${{ needs.resolve-version.outputs.version }}-macos-arm64.tar.gz
+            artifacts/sget-${{ needs.resolve-version.outputs.version }}-macos-x64.tar.gz
+            artifacts/sget-${{ needs.resolve-version.outputs.version }}-windows-x64.zip
+            artifacts/SHA256SUMS.txt
